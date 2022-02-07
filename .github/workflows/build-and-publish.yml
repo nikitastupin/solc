@@ -26,7 +26,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake .. -DSOLC_STATIC_STDLIBS=ON -DSOLC_LINK_STATIC=ON -DLLLC_LINK_STATIC=ON -DSTATIC_LINKING=TRUE
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DSOLC_STATIC_STDLIBS=ON -DSOLC_LINK_STATIC=ON -DLLLC_LINK_STATIC=ON -DSTATIC_LINKING=TRUE
           make -j4
       - uses: actions/upload-artifact@v2
         with:
