@@ -24,6 +24,7 @@ jobs:
           sudo apt-get -y install build-essential cmake git libboost-all-dev
       - name: Build
         run: |
+          touch prerelease.txt
           mkdir build
           cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DSOLC_STATIC_STDLIBS=ON -DSOLC_LINK_STATIC=ON -DLLLC_LINK_STATIC=ON -DSTATIC_LINKING=TRUE
