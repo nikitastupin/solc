@@ -1,0 +1,59 @@
+name: build and publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'ethereum/solidity repository tag to build'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: self-hosted
+    permissions:
+      contents: none
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          repository: ethereum/solidity
+          ref: ${{ github.event.inputs.tag }}
+      - name: Install dependencies
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install build-essential cmake git libboost-all-dev
+      - name: Build
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DSOLC_STATIC_STDLIBS=ON -DSOLC_LINK_STATIC=ON -DLLLC_LINK_STATIC=ON -DSTATIC_LINKING=TRUE
+          make -j4
+      - uses: actions/upload-artifact@v2
+        with:
+          name: solc
+          path: build/solc/solc
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+        with:
+          name: solc
+          path: linux/aarch64
+      - name: Rename binary
+        run: |
+          mv linux/aarch64/solc linux/aarch64/solc-${{ github.event.inputs.tag }}
+      - name: Upload binary
+        run: |
+          if [[ $(git status -s) ]]; then
+            git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+
+            git add linux/aarch64/solc-${{ github.event.inputs.tag }}
+            git commit -m "Add solc-${{ github.event.inputs.tag }} binary"
+            git push
+          fi
