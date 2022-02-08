@@ -21,7 +21,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get -y update
-          sudo apt-get -y install build-essential cmake git libboost-all-dev
+          # libjsoncpp-dev for v0.4.*
+          sudo apt-get -y install build-essential cmake git libboost-all-dev libjsoncpp-dev
       - name: Build
         run: |
           touch prerelease.txt
