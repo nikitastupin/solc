@@ -1,0 +1,85 @@
+name: build and publish
+
+on:
+  workflow_dispatch:
+  schedule:
+    # check every Monday at 8:00AM
+    - cron: '0 8 * * 1'
+
+jobs:
+  build:
+    runs-on: self-hosted
+    permissions:
+      contents: none
+    outputs:
+      release_tag: ${{ steps.solc-release.outputs.release_tag }}
+      release_version: ${{ steps.solc-release.outputs.release_version }}
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get -y update
+          # libjsoncpp-dev for v0.4.*
+          sudo apt-get -y install build-essential cmake git libboost-all-dev libjsoncpp-dev jq
+      - name: Fetch latest solidity tag
+        id: solc-release
+        run: |
+          echo ::set-output name=current_tag::$(cat solc/linux/aarch64/.current-tag)
+          tag_name=$(curl -sL https://api.github.com/repos/ethereum/solidity/releases/latest | jq -r ".tag_name")
+          version=$(tag_name#v)
+          echo ::set-output name=release_tag::$(tag_name)
+          echo ::set-output name=release_version::$(version)
+      - uses: actions/checkout@v2
+        if: steps.solc-release.outputs.current_tag != steps.solc-release.outputs.release_tag
+        with:
+          repository: ethereum/solidity
+          ref: ${{ steps.solc-release.outputs.release_tag }}
+      - name: Build
+        run: |
+          touch prerelease.txt
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release # -DSOLC_STATIC_STDLIBS=ON -DSOLC_LINK_STATIC=ON -DLLLC_LINK_STATIC=ON -DSTATIC_LINKING=TRUE
+          make -j4
+      - uses: actions/upload-artifact@v2
+        with:
+          name: solc
+          path: build/solc/solc
+
+  publish:
+    needs: build
+    runs-on: self-hosted
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/download-artifact@v2
+        with:
+          name: solc
+          path: linux/aarch64
+      - name: Rename binary
+        run: |
+          mv linux/aarch64/solc linux/aarch64/solc-${{ needs.build.outputs.release_tag }}
+      - name: Update current tag
+        run: |
+          echo ${{ needs.build.outputs.release_tag }} > linux/aarch64/.current-tag
+      - name: Update list.json
+        run: |
+          shasum=$(sha256sum linux/aarch64/solc-$${{ needs.build.outputs.release_tag }})
+          shasum=${shasum:0:64}
+          jq --arg v "${{ needs.build.outputs.release_version }}" --arg s "$shasum" '.builds += [{"version": $v, "sha256": $s}]' linux/aarch64/list.json > list-tmp.json && mv list-tmp.json linux/aarch64/list.json
+          jq --arg v "${{ needs.build.outputs.release_version }}" --arg t "${{ needs.build.outputs.release_tag }}" '.releases += {$v: $t}' linux/aarch64/list.json > list-tmp.json && mv list-tmp.json linux/aarch64/list.json
+      - name: Upload binary
+        run: |
+          if [[ $(git status -s) ]]; then
+            git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+
+            git add linux/aarch64/solc-${{ needs.build.outputs.release_tag }}
+            git add linux/aarch64/.current-tag
+            git add linux/aarch64/list.json
+
+            git commit -m "Add solc-${{ github.event.inputs.tag }} binary"
+            git push
+          fi
