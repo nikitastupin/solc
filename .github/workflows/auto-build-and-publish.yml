@@ -4,11 +4,12 @@ on:
     # check every Monday at 8:00AM
     - cron: '0 8 * * 1'
 
+permissions:
+  contents: none
+
 jobs:
-  build:
+  fetch-tags:
     runs-on: self-hosted
-    permissions:
-      contents: none
     outputs:
       release_tag: ${{ steps.solc-release.outputs.release_tag }}
       release_version: ${{ steps.solc-release.outputs.release_version }}
@@ -27,17 +28,22 @@ jobs:
           version=${tag_name#v}
           echo ::set-output name=release_tag::$(tag_name)
           echo ::set-output name=release_version::$(version)
+
+  build:
+    needs: fetch-tags
+    runs-on: self-hosted
+    if: needs.fetch-tags.outputs.current_tag != needs.fetch-tags.outputs.release_tag
+    steps:
       - uses: actions/checkout@v2
-        if: steps.solc-release.outputs.current_tag != steps.solc-release.outputs.release_tag
         with:
           repository: ethereum/solidity
-          ref: ${{ steps.solc-release.outputs.release_tag }}
+          ref: ${{ needs.fetch-tags.outputs.release_tag }}
       - name: Build
         run: |
           touch prerelease.txt
           mkdir build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release # -DSOLC_STATIC_STDLIBS=ON -DSOLC_LINK_STATIC=ON -DLLLC_LINK_STATIC=ON -DSTATIC_LINKING=TRUE
+          cmake .. -DCMAKE_BUILD_TYPE=Release
           make -j4
       - uses: actions/upload-artifact@v2
         with:
@@ -59,26 +65,26 @@ jobs:
           path: linux/aarch64
       - name: Rename binary
         run: |
-          mv linux/aarch64/solc linux/aarch64/solc-${{ needs.build.outputs.release_tag }}
+          mv linux/aarch64/solc linux/aarch64/solc-${{ needs.fetch-tags.outputs.release_tag }}
       - name: Update current tag
         run: |
-          echo ${{ needs.build.outputs.release_tag }} > linux/aarch64/.current-tag
+          echo ${{ needs.fetch-tags.outputs.release_tag }} > linux/aarch64/.current-tag
       - name: Update list.json
         run: |
-          shasum=$(sha256sum linux/aarch64/solc-$${{ needs.build.outputs.release_tag }})
+          shasum=$(sha256sum linux/aarch64/solc-$${{ needs.fetch-tags.outputs.release_tag }})
           shasum=${shasum:0:64}
-          jq --arg v "${{ needs.build.outputs.release_version }}" --arg s "$shasum" '.builds += [{"version": $v, "sha256": $s}]' linux/aarch64/list.json > list-tmp.json && mv list-tmp.json linux/aarch64/list.json
-          jq --arg v "${{ needs.build.outputs.release_version }}" --arg t "${{ needs.build.outputs.release_tag }}" '.releases += {$v: $t}' linux/aarch64/list.json > list-tmp.json && mv list-tmp.json linux/aarch64/list.json
+          jq --arg v "${{ needs.fetch-tags.outputs.release_version }}" --arg s "$shasum" '.builds += [{"version": $v, "sha256": $s}]' linux/aarch64/list.json > list-tmp.json && mv list-tmp.json linux/aarch64/list.json
+          jq --arg v "${{ needs.fetch-tags.outputs.release_version }}" --arg t "${{ needs.fetch-tags.outputs.release_tag }}" '.releases += {$v: $t}' linux/aarch64/list.json > list-tmp.json && mv list-tmp.json linux/aarch64/list.json
       - name: Upload binary
         run: |
           if [[ $(git status -s) ]]; then
             git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git config --local user.name "github-actions[bot]"
 
-            git add linux/aarch64/solc-${{ needs.build.outputs.release_tag }}
+            git add linux/aarch64/solc-${{ needs.fetch-tags.outputs.release_tag }}
             git add linux/aarch64/.current-tag
             git add linux/aarch64/list.json
 
-            git commit -m "Add solc-${{ github.event.inputs.tag }} binary"
+            git commit -m "Add solc-${{ needs.fetch-tags.outputs.release_tag }} binary"
             git push
           fi
