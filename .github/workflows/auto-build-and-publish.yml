@@ -11,6 +11,7 @@ jobs:
   fetch-tags:
     runs-on: self-hosted
     outputs:
+      current_tag: ${{ steps.solc-release.outputs.current_tag }}
       release_tag: ${{ steps.solc-release.outputs.release_tag }}
       release_version: ${{ steps.solc-release.outputs.release_version }}
     steps:
