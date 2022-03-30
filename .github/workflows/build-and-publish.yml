@@ -72,9 +72,14 @@ jobs:
         run: |
           echo ${{ needs.fetch-tags.outputs.release_tag }} > linux/aarch64/.current-tag
       - name: Update list.json
+        env:
+          VERSION: ${{ needs.fetch-tags.outputs.release_version }}
         run: |
           shasum=$(sha256sum linux/aarch64/solc-${{ needs.fetch-tags.outputs.release_tag }})
           shasum=${shasum:0:64}
+
+          jq 'del(.builds[] | select(.version == "$VERSION"))' linux/aarch64/list.json > list.json.tmp && mv list.json.tmp linux/aarch64/list.json
+
           jq --arg v "${{ needs.fetch-tags.outputs.release_version }}" --arg s "$shasum" '.builds += [{"version": $v, "sha256": $s}]' linux/aarch64/list.json > list-tmp.json && mv list-tmp.json linux/aarch64/list.json
           jq --arg v "${{ needs.fetch-tags.outputs.release_version }}" --arg t "solc-${{ needs.fetch-tags.outputs.release_tag }}" '.releases[$v] = $t' linux/aarch64/list.json > list-tmp.json && mv list-tmp.json linux/aarch64/list.json
       - name: Upload binary
