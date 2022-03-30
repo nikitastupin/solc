@@ -1,5 +1,8 @@
 name: build and publish
 
+# TODO:
+# - add the `workflow_run` event and remove the `build` and `publish` jobs from the `auto-build-and-publish.yml` workflow
+
 on:
   workflow_dispatch:
     inputs:
@@ -8,33 +11,40 @@ on:
         required: true
         type: string
 
+permissions: {}
+
 jobs:
-  build:
+  fetch-tags:
     runs-on: self-hosted
-    permissions:
-      contents: none
     outputs:
-      current_tag: ${{ steps.solc-current.outputs.tag }}
+      current_tag: ${{ steps.solc-release.outputs.current_tag }}
+      release_tag: ${{ steps.solc-release.outputs.release_tag }}
+      release_version: ${{ steps.solc-release.outputs.release_version }}
+    steps:
+      - id: solc-release
+        env:
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          echo ::set-output name=current_tag::v0.0.0
+          version=${TAG#v}
+          echo ::set-output name=release_tag::$TAG
+          echo ::set-output name=release_version::$version
+
+  build:
+    needs: fetch-tags
+    runs-on: self-hosted
+    if: needs.fetch-tags.outputs.current_tag != needs.fetch-tags.outputs.release_tag
     steps:
       - uses: actions/checkout@v2
         with:
           repository: ethereum/solidity
-          ref: ${{ github.event.inputs.tag }}
-      - name: Install dependencies
-        run: |
-          sudo apt-get -y update
-          # libjsoncpp-dev for v0.4.*
-          sudo apt-get -y install build-essential cmake git libboost-all-dev libjsoncpp-dev jq
-      - name: Get current tag
-        id: solc-current
-        run: |
-          echo ::set-output name=tag::$(cat solc/linux/aarch64/.current-tag)
+          ref: ${{ needs.fetch-tags.outputs.release_tag }}
       - name: Build
         run: |
           touch prerelease.txt
           mkdir build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release # -DSOLC_STATIC_STDLIBS=ON -DSOLC_LINK_STATIC=ON -DLLLC_LINK_STATIC=ON -DSTATIC_LINKING=TRUE
+          cmake .. -DCMAKE_BUILD_TYPE=Release
           make -j4
       - uses: actions/upload-artifact@v2
         with:
@@ -42,7 +52,7 @@ jobs:
           path: build/solc/solc
 
   publish:
-    needs: build
+    needs: [fetch-tags, build]
     runs-on: self-hosted
     permissions:
       contents: write
@@ -56,25 +66,24 @@ jobs:
           path: linux/aarch64
       - name: Rename binary
         run: |
-          mv linux/aarch64/solc linux/aarch64/solc-${{ github.event.inputs.tag }}
+          mv linux/aarch64/solc linux/aarch64/solc-${{ needs.fetch-tags.outputs.release_tag }}
       - name: Update current tag
-        if: ${{ github.event.inputs.tag }} > ${{ needs.build.outputs.current_tag }}
         run: |
-          echo ${{ github.event.inputs.tag }} > linux/aarch64/.current-tag
+          echo ${{ needs.fetch-tags.outputs.release_tag }} > linux/aarch64/.current-tag
       - name: Update list.json
         run: |
-          shasum=$(sha256sum linux/aarch64/solc-${{ github.event.inputs.tag }})
+          shasum=$(sha256sum linux/aarch64/solc-${{ needs.fetch-tags.outputs.release_tag }})
           shasum=${shasum:0:64}
-          version=${${{ github.event.inputs.tag }}#v}
-          jq --arg v "$version" --arg s "$shasum" '.builds += [{"version": $v, "sha256": $s}]' linux/aarch64/list.json > list-tmp.json && mv list-tmp.json linux/aarch64/list.json
-          jq --arg v "$version" --arg t "${{ github.event.inputs.tag }}" '.releases += {$v: $t}' linux/aarch64/list.json > list-tmp.json && mv list-tmp.json linux/aarch64/list.json
+          jq --arg v "${{ needs.fetch-tags.outputs.release_version }}" --arg s "$shasum" '.builds += [{"version": $v, "sha256": $s}]' linux/aarch64/list.json > list-tmp.json && mv list-tmp.json linux/aarch64/list.json
+          jq --arg v "${{ needs.fetch-tags.outputs.release_version }}" --arg t "solc-${{ needs.fetch-tags.outputs.release_tag }}" '.releases[$v] = $t' linux/aarch64/list.json > list-tmp.json && mv list-tmp.json linux/aarch64/list.json
       - name: Upload binary
         run: |
           if [[ $(git status -s) ]]; then
             git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git config --local user.name "github-actions[bot]"
-
-            git add linux/aarch64/solc-${{ github.event.inputs.tag }}
-            git commit -m "Add solc-${{ github.event.inputs.tag }} binary"
+            git add linux/aarch64/solc-${{ needs.fetch-tags.outputs.release_tag }}
+            git add linux/aarch64/.current-tag
+            git add linux/aarch64/list.json
+            git commit -m "Add solc-${{ needs.fetch-tags.outputs.release_tag }} binary"
             git push
           fi
