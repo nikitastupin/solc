@@ -1,10 +1,6 @@
 {
   "builds": [
     {
-      "version": "0.5.0",
-      "sha256": "e54015fff10f033f44ced556eaa6a80ae3db0c3af791906c612f7503860ca68b"
-    },
-    {
       "version": "0.5.1",
       "sha256": "28f2bba1bd0398aec3d7b1df6b491222f9a16762b60bacafc87dd3a9139d275f"
     },
@@ -179,6 +175,10 @@
     {
       "version": "0.6.12",
       "sha256": "e2c0796b8b3ea9f6f22530de74390a40b5598531824c0b57015482cf8251a287"
+    },
+    {
+      "version": "0.5.0",
+      "sha256": "34f52e974ade0defef795abe9b8f38775517812b05dc213307d32a70ec282dfd"
     }
   ],
   "releases": {
