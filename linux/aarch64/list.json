@@ -41,10 +41,6 @@
       "sha256": "d5882750a211eab1bd23a20eda4a099b74c768facba756e6203bea9d316507f2"
     },
     {
-      "version": "0.6.11",
-      "sha256": "c522f69054671ce6c5f211011f872d43a73bd7cc1e1c9f022b79d4827d92b55c"
-    },
-    {
       "version": "0.7.0",
       "sha256": "2c4a981f5afe832f0ad8f7934fa87cb6148555767b0c48ac64c5b9df8546c31b"
     },
@@ -179,6 +175,10 @@
     {
       "version": "0.6.10",
       "sha256": "7bf5aa730a00ddaf948d554dfd8d20bd44067a505d8cf50bbb2e4d54d6764af2"
+    },
+    {
+      "version": "0.6.11",
+      "sha256": "0500b3bff78a85758e0712a9076ea3c3f5f1ee681f2d30e5affae70a9f5e98d6"
     }
   ],
   "releases": {
