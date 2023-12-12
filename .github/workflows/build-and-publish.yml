@@ -67,8 +67,7 @@ jobs:
       - name: Rename binary
         run: |
           mv linux/aarch64/solc linux/aarch64/solc-${{ needs.fetch-tags.outputs.release_tag }}
-      - if: github.event_name != 'workflow_dispatch'
-        name: Update current tag
+      - name: Update current tag
         run: |
           echo ${{ needs.fetch-tags.outputs.release_tag }} > linux/aarch64/.current-tag
       - name: Update list.json
