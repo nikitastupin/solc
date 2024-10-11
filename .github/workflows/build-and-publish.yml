@@ -35,7 +35,7 @@ jobs:
     runs-on: self-hosted
     if: needs.fetch-tags.outputs.current_tag != needs.fetch-tags.outputs.release_tag
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           repository: ethereum/solidity
           ref: ${{ needs.fetch-tags.outputs.release_tag }}
@@ -46,7 +46,7 @@ jobs:
           cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release
           make -j4
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: solc
           path: build/solc/solc
@@ -57,10 +57,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
           name: solc
           path: linux/aarch64
