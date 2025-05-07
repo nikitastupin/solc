@@ -44,7 +44,7 @@ jobs:
           touch prerelease.txt
           mkdir build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DSOLC_LINK_STATIC=ON
           make -j4
       - uses: actions/upload-artifact@v4
         with:
